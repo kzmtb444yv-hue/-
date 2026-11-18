@@ -3,70 +3,142 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>課題忘れない</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>課題管理</title>
 <style>
-  body { font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 16px; background: #f5f5f5; }
-  h1 { font-size: 22px; }
-  form { display: flex; flex-direction: column; gap: 8px; background: white; padding: 12px; border-radius: 8px; }
-  input, button { padding: 10px; font-size: 16px; }
-  button { background: #2563eb; color: white; border: none; border-radius: 6px; }
-  ul { list-style: none; padding: 0; }
-  li { background: white; margin: 8px 0; padding: 12px; border-radius: 8px; border-left: 6px solid #22c55e; display: flex; justify-content: space-between; align-items: center; }
-  li.soon { border-left-color: #f59e0b; }
-  li.urgent { border-left-color: #ef4444; }
-  li.over { border-left-color: #6b7280; opacity: 0.6; }
-  .info small { color: #666; }
-  .del { background: #e5e7eb; color: #333; }
+  body{font-family:-apple-system,sans-serif;margin:0;padding:16px;background:#f4f5f7;color:#222}
+  h1{font-size:20px;margin:0 0 12px}
+  .box{background:#fff;border-radius:12px;padding:12px;margin-bottom:12px}
+  input{width:100%;box-sizing:border-box;padding:10px;margin-bottom:8px;border:1px solid #ccc;border-radius:8px;font-size:16px}
+  button{border:0;border-radius:8px;padding:10px 12px;font-size:14px;color:#fff;background:#3b82f6}
+  button.sub{background:#10b981}
+  button.del{background:#9ca3af}
+  button.all{background:#8b5cf6;width:100%;margin-bottom:12px;font-size:16px}
+  .task{background:#fff;border-radius:12px;padding:12px;margin-bottom:8px;border-left:6px solid #d1d5db}
+  .task.soon{border-left-color:#f59e0b}
+  .task.urgent{border-left-color:#ef4444}
+  .task.over{border-left-color:#7f1d1d;opacity:.7}
+  .task.done{opacity:.4;text-decoration:line-through}
+  .meta{font-size:13px;color:#666;margin:4px 0 8px}
+  .btns{display:flex;gap:6px;flex-wrap:wrap}
 </style>
 </head>
 <body>
-<h1>課題忘れない</h1>
-<form id="form">
-  <input id="subject" placeholder="科目" required>
-  <input id="title" placeholder="課題の内容" required>
-  <input id="due" type="date" required>
-  <button type="submit">追加</button>
-</form>
-<ul id="list"></ul>
+<h1>📚 課題管理</h1>
+
+<div class="box">
+  <input id="subject" placeholder="科目">
+  <input id="title" placeholder="課題の内容">
+  <input id="due" type="date">
+  <button onclick="addTask()" style="width:100%;font-size:16px">追加</button>
+</div>
+
+<button class="all" onclick="exportAll()">📅 未完了の課題をまとめてカレンダーに追加</button>
+<div id="list"></div>
 
 <script>
-let tasks = JSON.parse(localStorage.getItem("tasks") || "[]");
+var KEY = "kadai_tasks";
+var tasks = [];
+try { tasks = JSON.parse(localStorage.getItem(KEY)) || []; } catch(e) { tasks = []; }
 
-function save() { localStorage.setItem("tasks", JSON.stringify(tasks)); }
+function save(){ try { localStorage.setItem(KEY, JSON.stringify(tasks)); } catch(e){} }
+function esc(s){ return String(s).replace(/[&<>"']/g, function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
 
-function daysLeft(due) {
-  const today = new Date(); today.setHours(0,0,0,0);
-  return Math.round((new Date(due) - today) / 86400000);
+function daysLeft(due){
+  var now = new Date(); now.setHours(0,0,0,0);
+  var d = new Date(due + "T00:00:00");
+  return Math.round((d - now) / 86400000);
 }
 
-function render() {
-  const list = document.getElementById("list");
-  list.innerHTML = "";
-  tasks.sort((a, b) => a.due.localeCompare(b.due));
-  tasks.forEach((t, i) => {
-    const d = daysLeft(t.due);
-    const li = document.createElement("li");
-    li.className = d < 0 ? "over" : d <= 1 ? "urgent" : d <= 3 ? "soon" : "";
-    const label = d < 0 ? "期限切れ" : d === 0 ? "今日まで！" : "あと" + d + "日";
-    li.innerHTML = `<div class="info"><strong>${t.subject}</strong>　${t.title}<br><small>${t.due}（${label}）</small></div>`;
-    const btn = document.createElement("button");
-    btn.textContent = "完了";
-    btn.className = "del";
-    btn.onclick = () => { tasks.splice(i, 1); save(); render(); };
-    li.appendChild(btn);
-    list.appendChild(li);
-  });
+function addTask(){
+  var s = document.getElementById("subject").value.trim();
+  var t = document.getElementById("title").value.trim();
+  var d = document.getElementById("due").value;
+  if(!t || !d){ alert("課題の内容と締め切りを入れてね"); return; }
+  tasks.push({id: Date.now() + Math.random(), subject: s, title: t, due: d, done: false});
+  document.getElementById("subject").value = "";
+  document.getElementById("title").value = "";
+  document.getElementById("due").value = "";
+  save(); render();
 }
 
-document.getElementById("form").onsubmit = e => {
-  e.preventDefault();
-  tasks.push({
-    subject: document.getElementById("subject").value,
-    title: document.getElementById("title").value,
-    due: document.getElementById("due").value
+function toggle(id){ tasks.forEach(function(x){ if(x.id===id) x.done=!x.done; }); save(); render(); }
+function removeTask(id){ if(!confirm("削除する？")) return; tasks = tasks.filter(function(x){return x.id!==id;}); save(); render(); }
+
+function render(){
+  tasks.sort(function(a,b){ return a.due < b.due ? -1 : a.due > b.due ? 1 : 0; });
+  var html = "";
+  tasks.forEach(function(x){
+    var n = daysLeft(x.due);
+    var cls = "task";
+    var label;
+    if(x.done) cls += " done";
+    else if(n < 0) cls += " over";
+    else if(n <= 1) cls += " urgent";
+    else if(n <= 3) cls += " soon";
+    if(n < 0) label = Math.abs(n) + "日過ぎてる";
+    else if(n === 0) label = "今日まで！";
+    else label = "あと" + n + "日";
+    html += '<div class="' + cls + '">'
+      + '<b>' + esc(x.title) + '</b>'
+      + '<div class="meta">' + esc(x.subject) + ' ／ ' + x.due + '（' + label + '）</div>'
+      + '<div class="btns">'
+      + '<button class="sub" onclick="toggle(' + x.id + ')">' + (x.done ? "戻す" : "完了") + '</button>'
+      + '<button onclick="exportOne(' + x.id + ')">📅 カレンダーに追加</button>'
+      + '<button class="del" onclick="removeTask(' + x.id + ')">削除</button>'
+      + '</div></div>';
   });
-  save(); render(); e.target.reset();
-};
+  document.getElementById("list").innerHTML = html || '<p style="text-align:center;color:#888">課題を追加してね</p>';
+}
+
+/* ---- カレンダー(.ics)書き出し ---- */
+function ymd(dateStr, plusDays){
+  var d = new Date(dateStr + "T00:00:00");
+  d.setDate(d.getDate() + (plusDays || 0));
+  var m = ("0" + (d.getMonth()+1)).slice(-2), day = ("0" + d.getDate()).slice(-2);
+  return d.getFullYear() + m + day;
+}
+function icsText(s){ return String(s).replace(/\\/g,"\\\\").replace(/;/g,"\\;").replace(/,/g,"\\,").replace(/\n/g," "); }
+
+function eventLines(x){
+  var name = (x.subject ? "【" + x.subject + "】" : "") + x.title;
+  var stamp = new Date().toISOString().replace(/[-:]/g,"").split(".")[0] + "Z";
+  var L = [
+    "BEGIN:VEVENT",
+    "UID:" + String(x.id).replace(/\./g,"") + "@kadai-app",
+    "DTSTAMP:" + stamp,
+    "DTSTART;VALUE=DATE:" + ymd(x.due, 0),
+    "DTEND;VALUE=DATE:" + ymd(x.due, 1),
+    "SUMMARY:" + icsText("課題 " + name)
+  ];
+  // 3日前の朝9時 / 前日の朝9時 / 当日の朝9時
+  [["-P2DT15H","3日前"],["-PT15H","前日"],["PT9H","今日が締め切り"]].forEach(function(a){
+    L.push("BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:" + icsText(a[1] + "：" + name),"TRIGGER:" + a[0],"END:VALARM");
+  });
+  L.push("END:VEVENT");
+  return L;
+}
+
+function download(lines, filename){
+  var body = ["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//kadai-app//JP","CALSCALE:GREGORIAN"].concat(lines, ["END:VCALENDAR"]).join("\r\n");
+  var blob = new Blob([body], {type: "text/calendar;charset=utf-8"});
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
+}
+
+function exportOne(id){
+  var x = tasks.filter(function(t){return t.id===id;})[0];
+  if(x) download(eventLines(x), "kadai.ics");
+}
+function exportAll(){
+  var lines = [];
+  tasks.filter(function(t){ return !t.done && daysLeft(t.due) >= 0; }).forEach(function(t){ lines = lines.concat(eventLines(t)); });
+  if(!lines.length){ alert("追加できる課題がないよ"); return; }
+  download(lines, "kadai-all.ics");
+}
 
 render();
 </script>
